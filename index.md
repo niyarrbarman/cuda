@@ -4,11 +4,9 @@ title: cuda learning log
 date: 2025-11-12
 ---
 
-# cuda learning log
-
 learning cuda programming from scratch. tracking what works, what doesn't, and how fast things go.
 
-## vec-add
+## nov 11 2025: vec-add
 
 basic vector addition. cpu vs gpu benchmark with 10M elements.
 
