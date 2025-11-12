@@ -12,7 +12,7 @@ learning cuda programming from scratch. tracking what works, what doesn't, and h
 
 basic vector addition. cpu vs gpu benchmark with 10M elements.
 
-code: [00_vec_add.cu](https://github.com/niyarrbarman/cuda/vec-add/00_vec_add.cu)
+code: [00_vec_add.cu](https://github.com/niyarrbarman/cuda/tree/main/vec-add/00_vec_add.cu)
 
 implemented:
 - host and device memory management
