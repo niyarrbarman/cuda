@@ -1,0 +1,16 @@
+title: cuda learning log
+author: Niyar Barman
+description: learning cuda programming from scratch
+url: https://niyarrbarman.github.io/cuda
+baseurl: /cuda
+
+# Theme
+theme: minima
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+
+# Navigation
+header_pages:
+  - README.md

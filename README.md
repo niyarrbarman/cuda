@@ -1,3 +1,9 @@
+---
+layout: default
+title: cuda learning log
+date: 2025-11-12
+---
+
 # cuda learning log
 
 learning cuda programming from scratch. tracking what works, what doesn't, and how fast things go.
@@ -6,7 +12,7 @@ learning cuda programming from scratch. tracking what works, what doesn't, and h
 
 basic vector addition. cpu vs gpu benchmark with 10M elements.
 
-code: [00_vec_add.cu](vec-add/00_vec_add.cu)
+code: [00_vec_add.cu](https://github.com/niyarrbarman/cuda/vec-add/00_vec_add.cu)
 
 implemented:
 - host and device memory management
@@ -35,7 +41,3 @@ what i learned:
 - block/thread indexing: `blockIdx.x * blockDim.x + threadIdx.x`
 - `cudaDeviceSynchronize()` to wait for kernel completion
 - gpu isn't always faster (memory transfer overhead matters)
-
----
-
-_work in progress. adding more as i learn._

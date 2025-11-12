@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page.title }} | {{ site.title }}</title>
+    <style>
+        body {
+            font-family: Georgia, serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+        }
+        h1.site-title {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        nav {
+            border-top: 1px dotted #999;
+            border-bottom: 1px dotted #999;
+            padding: 15px 0;
+            margin: 20px 0;
+        }
+        nav a {
+            margin: 0 15px;
+            text-decoration: underline;
+            color: #000;
+        }
+        nav a:hover {
+            color: #666;
+        }
+        .content {
+            margin-top: 40px;
+        }
+        h2 {
+            font-size: 1.8em;
+            margin-top: 40px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        .date {
+            color: #666;
+            font-size: 0.9em;
+            font-style: italic;
+        }
+        footer {
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 1px dotted #999;
+            text-align: center;
+            font-size: 0.9em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1 class="site-title">{{ site.title }}</h1>
+        <nav>
+            <a href="https://niyarrbarman.github.io">Home</a>
+            <a href="{{ site.baseurl }}/">Blog</a>
+        </nav>
+    </header>
+
+    <div class="content">
+        {{ content }}
+    </div>
+
+    <footer>
+        <p><em>work in progress. adding more as i learn.</em></p>
+    </footer>
+</body>
+</html>
