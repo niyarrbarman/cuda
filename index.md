@@ -6,13 +6,13 @@ date: 2025-11-12
 
 learning cuda programming from scratch. tracking what works, what doesn't, and how fast things go.
 
-resources:
+### resources:
  - [hpc computing with gpus - elliot arledge](https://www.youtube.com/watch?v=86FAWCzIe_4)
  - [gpu programming - simon oz](https://www.youtube.com/playlist?list=PL5XwKDZZlwaY7t0M5OLprpkJUIrF8Lc9j)
 
 ---
 
-## contents
+### contents
 
 - [vec-add](#nov-11-2025-vec-add) — basic gpu vector addition
 - [vec-add 3d](#nov-15-2025-vec-add-3d) — 1d vs 3d kernel layouts
@@ -38,7 +38,11 @@ __global__ void vector_add_gpu(float *a, float* b, float*c, int n){
 }
 ```
 
-`blockIdx.x * blockDim.x + threadIdx.x` gives the global thread index. the `if` guard prevents out-of-bounds access when N isn't a perfect multiple of block size.
+the global thread index formula:
+
+<p class="math">i = blockIdx.x × blockDim.x + threadIdx.x</p>
+
+the `if` guard prevents out-of-bounds access when N isn't a perfect multiple of block size.
 
 memory setup follows host → device → compute → device → host pattern:
 
@@ -58,7 +62,11 @@ vector_add_gpu<<<num_blocks, BLOCK_SIZE>>>(da, db, dc, N);
 cudaDeviceSynchronize();
 ```
 
-the `<<<num_blocks, BLOCK_SIZE>>>` syntax is cuda's way of specifying grid and block dimensions. `cudaDeviceSynchronize()` waits for the kernel to finish before timing.
+the `<<<num_blocks, BLOCK_SIZE>>>` syntax is cuda's way of specifying grid and block dimensions. number of blocks needed:
+
+<p class="math">num_blocks = ⌈N / BLOCK_SIZE⌉</p>
+
+`cudaDeviceSynchronize()` waits for the kernel to finish before timing.
 
 implemented:
 - host and device memory management
@@ -91,7 +99,9 @@ __global__ void vector_add_gpu_1d(float *a, float *b, float *c, int n) {
 }
 ```
 
-3d kernel treats the flat array as a 3d volume. each thread gets (i, j, k) coordinates:
+3d kernel treats the flat array as a 3d volume. each thread gets (i, j, k) coordinates. the linearized index:
+
+<p class="math">idx = i + j·nₓ + k·nₓ·nᵧ</p>
 
 ```cuda
 __global__ void vector_add_gpu_3d(float *a, float *b, float *c, int nx, int ny, int nz) {
@@ -157,7 +167,13 @@ __global__ void matmul(float* a, float* b, float* c, int n){
 }
 ```
 
-`row * n + i` walks along row of A. `i * n + col` walks down column of B. simple but not optimal — lots of global memory reads.
+`row * n + i` walks along row of A. `i * n + col` walks down column of B. 
+
+matrix multiplication: C = A × B where each element:
+
+<p class="math">Cᵢⱼ = Σₖ Aᵢₖ · Bₖⱼ</p>
+
+complexity is O(n³) — each of n² threads does n multiply-adds. simple but not optimal — lots of global memory reads.
 
 2d grid setup maps naturally to matrix structure:
 
@@ -188,7 +204,11 @@ broadcasting addition across tensors of different shapes. adds a 3d tensor (X,Y,
 
 code: [add_broadcast.cu](https://github.com/niyarrbarman/cuda/tree/main/src/add_broadcast/add_broadcast.cu)
 
-the trick is computing the right index for each tensor rank:
+the trick is computing the right index for each tensor rank. for tensors with shapes (X, Y, Z), (X, Y), and (X):
+
+<p class="math">idx₃ = x·(Y·Z) + y·Z + z</p>
+<p class="math">idx₂ = x·Y + y</p>
+<p class="math">idx₁ = x</p>
 
 ```cuda
 __global__ void add_broadcast(

@@ -8,6 +8,9 @@ baseurl: /cuda
 markdown: kramdown
 highlighter: rouge
 
+kramdown:
+  math_engine: null
+
 # Navigation
 header_pages:
   - README.md
