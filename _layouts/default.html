@@ -6,99 +6,148 @@
     <title>{{ page.title }} | {{ site.title }}</title>
     <link rel="icon" type="image/x-icon" href="{{ site.baseurl }}/assets/gpu_9126701.ico">
     <link rel="icon" type="image/png" href="{{ site.baseurl }}/assets/gpu_9126701.png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <style>
         body {
-            font-family: 'Times New Roman', Times, serif;
-            max-width: 700px;
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            max-width: 680px;
             margin: 0 auto;
-            padding: 40px 60px;
-            line-height: 1.7;
-            color: #2c2416;
-            background-color: #faf8f3;
+            padding: 40px 24px;
+            line-height: 1.75;
+            color: #3d3229;
+            background-color: #faf7f2;
+            font-size: 17px;
         }
         header {
             text-align: center;
-            margin-bottom: 40px;
-            padding-bottom: 20px;
+            margin-bottom: 30px;
         }
         h1.site-title {
-            font-size: 2em;
-            margin-bottom: 10px;
-            color: #4a3c28;
+            font-size: 1.8em;
+            font-weight: normal;
+            margin-bottom: 15px;
+            color: #2c2418;
         }
         nav {
-            border-top: 1px dotted #c9b896;
-            border-bottom: 1px dotted #c9b896;
-            padding: 15px 0;
             margin: 20px 0;
         }
+        .nav-dots {
+            color: #c9b896;
+            letter-spacing: 2px;
+            font-size: 12px;
+            margin: 15px 0;
+        }
         nav a {
-            margin: 0 15px;
+            margin: 0 8px;
             text-decoration: underline;
-            color: #6b5638;
+            color: #2c2418;
         }
         nav a:hover {
-            color: #8b7355;
-        }
-        header a {
-            color: inherit;
-            text-decoration: underline;
-        }
-        header a:hover {
-            color: #8b7355;
+            color: #6b5638;
         }
         .content {
-            margin-top: 40px;
+            margin-top: 30px;
         }
         h2 {
-            font-size: 1.8em;
-            margin-top: 40px;
-            border-bottom: 1px solid #e6dcc8;
-            padding-bottom: 10px;
-            color: #4a3c28;
+            font-size: 1.6em;
+            font-weight: normal;
+            margin-top: 50px;
+            margin-bottom: 20px;
+            color: #2c2418;
+        }
+        h3 {
+            font-size: 1.3em;
+            font-weight: normal;
+            margin-top: 35px;
+            margin-bottom: 15px;
+            color: #2c2418;
+        }
+        p {
+            margin-bottom: 1.2em;
+        }
+        a {
+            color: #8b4513;
+            text-decoration: underline;
+        }
+        a:hover {
+            color: #a0522d;
         }
         code {
-            background: #f5f0e8;
-            padding: 2px 6px;
+            background: #f0ebe3;
+            padding: 2px 5px;
             border-radius: 3px;
-            font-family: 'Courier New', monospace;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.9em;
             color: #5a4a32;
         }
         pre {
             background: #f5f0e8;
-            padding: 15px;
-            border-radius: 5px;
+            padding: 16px 20px;
+            border-radius: 4px;
             overflow-x: auto;
-            border: 1px solid #e6dcc8;
+            border-left: 3px solid #d4c4a8;
+            margin: 1.5em 0;
         }
         pre code {
             background: none;
             padding: 0;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+        blockquote {
+            border-left: 3px solid #d4c4a8;
+            margin: 1.5em 0;
+            padding-left: 20px;
+            color: #6b5638;
+            font-style: italic;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 1.5em;
+        }
+        li {
+            margin-bottom: 0.5em;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #e6dcc8;
+            margin: 40px 0;
         }
         .date {
             color: #8b7355;
             font-size: 0.9em;
             font-style: italic;
         }
+        strong {
+            font-weight: 600;
+            color: #2c2418;
+        }
+        em {
+            font-style: italic;
+        }
         footer {
             margin-top: 60px;
             padding-top: 20px;
-            border-top: 1px dotted #c9b896;
+            border-top: 1px solid #e6dcc8;
             text-align: center;
             font-size: 0.9em;
             color: #8b7355;
+        }
+        /* Math styling */
+        .katex-display {
+            margin: 1.5em 0;n
         }
     </style>
 </head>
 <body>
     <header>
-        
+        <h1 class="site-title">{{ site.title }}</h1>
+        <p style="margin-top: -10px; color: #8b7355; font-size: 0.95em;">~ Niyar R Barman</p>
         <nav>
-            <h1 class="site-title">{{ site.title }}</h1>
-        </nav>
-        <center>
             <a href="https://niyarrbarman.github.io">Home</a>
-        </center>
+            <a href="{{ site.baseurl }}/">Blog</a>
+        </nav>
+        <div class="nav-dots">............................................................................................................................</div>
     </header>
 
     <div class="content">

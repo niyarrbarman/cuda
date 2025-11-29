@@ -1,1 +1,30 @@
+# Compiled binaries
 *.out
+*.o
+*.exe
+
+# CUDA
+*.cubin
+*.ptx
+*.fatbin
+
+# Jekyll
+_site/
+.sass-cache/
+.jekyll-cache/
+.jekyll-metadata
+Gemfile.lock
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
