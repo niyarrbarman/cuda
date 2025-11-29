@@ -83,12 +83,53 @@
             margin: 15px 0;
         }
         nav a {
-            margin: 0 8px;
-            text-decoration: underline;
+            margin: 0 10px;
+            text-decoration: none;
             color: var(--heading);
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
         nav a:hover {
             color: var(--muted);
+        }
+        .nav-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+        }
+        .nav-icon.home-icon,
+        .nav-icon.blog-icon {
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        .nav-label {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            top: 1.6em;
+            font-size: 0.7em;
+            letter-spacing: 0.06em;
+            text-transform: lowercase;
+            color: var(--muted);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease-in-out;
+        }
+        nav a:hover .nav-label {
+            opacity: 1;
+        }
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
         }
         .content {
             margin-top: 30px;
@@ -125,6 +166,7 @@
             font-size: 0.9em;
             color: var(--code-text);
         }
+        
         pre {
             background: var(--pre-bg);
             padding: 16px 20px;
@@ -148,10 +190,21 @@
         }
         ul, ol {
             margin: 1em 0;
-            padding-left: 1.5em;
+            padding-left: 0;
+            list-style: none;
         }
         li {
-            margin-bottom: 0.5em;
+            position: relative;
+            margin: 0.25em 0;
+            padding-left: 1.2rem;
+        }
+        li::before {
+            content: "•";
+            position: absolute;
+            left: 0.2rem;
+            top: 0.05rem;
+            color: var(--link);
+            font-size: 0.9em;
         }
         hr {
             border: none;
@@ -182,6 +235,43 @@
             margin-top: -10px;
             color: var(--muted);
             font-size: 0.95em;
+        }
+        /* TOC styling */
+        .toc {
+            border: 1px solid var(--hr);
+            border-radius: 4px;
+            padding: 8px 12px 10px;
+            background: rgba(0, 0, 0, 0.02);
+            margin: 10px 0 20px;
+        }
+        .toc-list {
+            margin: 0;
+        }
+        .toc-list li {
+            padding-left: 0.9rem;
+        }
+        .toc-list li::before {
+            content: "→";
+            left: 0.1rem;
+            font-size: 0.85em;
+        }
+        .toc-note {
+            color: var(--muted);
+            margin-left: 0.4rem;
+            font-size: 0.9em;
+        }
+        /* Resources list */
+        .resource-list {
+            margin: 0.3em 0 1.2em;
+        }
+        .resource-list li {
+            padding-left: 0.9rem;
+        }
+        .resource-list li::before {
+            content: "↗";
+            left: 0.1rem;
+            font-size: 0.8em;
+            color: var(--link);
         }
         /* Math styling */
         .math {
@@ -239,7 +329,7 @@
                 right: -5px;
             }
             ul, ol {
-                padding-left: 1.2em;
+                padding-left: 0;
             }
             blockquote {
                 margin-left: 0;
@@ -252,10 +342,18 @@
     <header>
         <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">🌙</button>
         <h1 class="site-title">{{ site.title }}</h1>
-        <p class="author">~ Niyar R Barman</p>
+        <p class="author">~ niyar r barman</p>
         <nav>
-            <a href="https://niyarrbarman.github.io">Home</a>
-            <a href="{{ site.baseurl }}/">Blog</a>
+            <a href="https://niyarrbarman.github.io" aria-label="home">
+                <span class="nav-icon home-icon" style="background-image: url('{{ site.baseurl }}/assets/home-icon.png');"></span>
+                <span class="nav-label">home</span>
+                <span class="sr-only">home</span>
+            </a>
+            <a href="{{ site.baseurl }}/" aria-label="blog">
+                <span class="nav-icon blog-icon" style="background-image: url('{{ site.baseurl }}/assets/blog-icon.png');"></span>
+                <span class="nav-label">blog</span>
+                <span class="sr-only">blog</span>
+            </a>
         </nav>
         <div class="nav-dots">............................................................................................................................</div>
     </header>

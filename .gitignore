@@ -24,6 +24,18 @@ __pycache__/
 Thumbs.db
 
 # Editor
+
+# Python venvs and notebooks
+.venv/
+.env/
+.ipynb_checkpoints/
+*.ipynb
+
+# Triton-specific logs and caches
+src/triton/__pycache__/
+src/triton/.venv/
+src/triton/.ipynb_checkpoints/
+src/triton/*.log
 *.swp
 *.swo
 *~

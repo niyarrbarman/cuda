@@ -4,26 +4,50 @@ title: cuda
 date: 2025-11-12
 ---
 
-learning cuda programming from scratch. tracking what works, what doesn't, and how fast things go.
+learning cuda (and now triton) from scratch. tracking what works, what doesn't, and how fast things go.
 
 ### resources:
- - [hpc computing with gpus - elliot arledge](https://www.youtube.com/watch?v=86FAWCzIe_4)
- - [gpu programming - simon oz](https://www.youtube.com/playlist?list=PL5XwKDZZlwaY7t0M5OLprpkJUIrF8Lc9j)
+
+<ul class="resource-list">
+    <li>
+        <a href="https://www.youtube.com/watch?v=86FAWCzIe_4">
+            hpc computing with gpus — elliot arledge
+        </a>
+    </li>
+    <li>
+        <a href="https://www.youtube.com/playlist?list=PL5XwKDZZlwaY7t0M5OLprpkJUIrF8Lc9j">
+            gpu programming — simon oz
+        </a>
+    </li>
+    <li>
+        <a href="https://www.youtube.com/watch?v=DdTsX6DQk24">
+            practitioner's guide to triton — umer h adil
+        </a>
+    </li>
+</ul>
 
 ---
 
 ### contents
 
-- [vec-add](#nov-11-2025-vec-add) — basic gpu vector addition
-- [vec-add 3d](#nov-15-2025-vec-add-3d) — 1d vs 3d kernel layouts
-- [matmul](#nov-22-2025-matmul) — naive matrix multiplication
-- [add_broadcast](#nov-28-2025-add_broadcast) — broadcasting across tensor ranks
+<div class="toc">
+    <!-- <div class="toc-label">entries so far</div> -->
+    <ul class="toc-list">
+        <li><a href="#nov-11-2025-vec-add">vec-add</a><span class="toc-note">basic gpu vector addition</span></li>
+        <li><a href="#nov-15-2025-vec-add-3d">vec-add 3d</a><span class="toc-note">1d vs 3d kernel layouts</span></li>
+        <li><a href="#nov-22-2025-matmul">matmul</a><span class="toc-note">naive matrix multiplication</span></li>
+        <li><a href="#nov-22-2025-triton-add-and-softmax">triton</a><span class="toc-note">writing gpu kernels in python</span></li>
+        <li><a href="#nov-28-2025-add-broadcast">add_broadcast</a><span class="toc-note">broadcasting across tensor ranks</span></li>
+    </ul>
+</div>
 
 ---
 
 ## nov 11 2025: vec-add
 
 basic vector addition. cpu vs gpu benchmark with 10M elements.
+
+this was day 1 stuff. i just wanted a kernel that ran end-to-end: allocate, copy, launch, time it, and see numbers move. most of the work here was convincing myself that the indexing math was actually correct and i wasn’t silently writing out of bounds.
 
 code: [00_vec_add.cu](https://github.com/niyarrbarman/cuda/tree/main/src/vec-add/00_vec_add.cu)
 
@@ -86,6 +110,8 @@ what i learned:
 
 extended vec-add to compare 1d vs 3d kernel layouts. same operation, different thread organization.
 
+this was me coming back to the same problem but forcing it into a 3d shape. the goal was less “go faster” and more “do i really understand `dim3` and 3d indexing, or am i faking it?”. treating a flat array as (nx, ny, nz) made the indexing formulas click.
+
 code: [01_vec_add_3d.cu](https://github.com/niyarrbarman/cuda/tree/main/src/vec-add/01_vec_add_3d.cu)
 
 1d kernel is straightforward. one dimension, linear indexing:
@@ -144,9 +170,11 @@ what i learned:
 
 ---
 
-## nov 22 2025: matmul
+## nov 16 2025: matmul
 
 naive matrix multiplication on gpu. each thread computes one output element.
+
+after vec-add, matmul felt like the natural next thing. it shows up everywhere, and you can’t hide from the O(n³) cost. this is where i started thinking harder about memory access patterns, even though this version is still the simple, non-tiled one.
 
 code: [matmul.cu](https://github.com/niyarrbarman/cuda/tree/main/src/matmul/matmul.cu)
 
@@ -198,9 +226,68 @@ what i learned:
 
 ---
 
+## nov 22 2025: triton add and softmax
+
+tried triton for the first time. writing gpu kernels in python feels weirdly nice.
+
+this is where i temporarily stepped away from cuda c++ and rewrote the same ideas in triton. add first, then softmax. it was fun to see the same indexing and stability tricks (subtract max) but with nicer ergonomics and masking instead of manual `if (idx < n)` guards.
+
+code: [add.py](https://github.com/niyarrbarman/cuda/tree/main/src/triton/add.py), [softmax.py](https://github.com/niyarrbarman/cuda/tree/main/src/triton/softmax.py)
+
+triton add kernel looks like this:
+
+```python
+@triton.jit
+def add_kernel(x_ptr, y_ptr, out_ptr, n_elements, BLOCK_SIZE: tl.constexpr):
+    pid = tl.program_id(0)
+    block_start = pid * BLOCK_SIZE
+    offsets = block_start + tl.arange(0, BLOCK_SIZE)
+    mask = offsets < n_elements
+    x = tl.load(x_ptr + offsets, mask=mask)
+    y = tl.load(y_ptr + offsets, mask=mask)
+    output = x + y
+    tl.store(out_ptr + offsets, output, mask=mask)
+```
+
+and the softmax kernel:
+
+```python
+@triton.jit
+def _softmax_kernel(
+    out_ptr,
+    stride_out,
+    x_ptr,
+    stride_x,
+    cols,
+    block_size: tl.constexpr,
+    num_warps: tl.constexpr,
+):
+    row_idx = tl.program_id(0)
+    row_start_ptr = x_ptr + (row_idx * stride_x)
+    col_offsets = tl.arange(0, block_size)
+    input_ptrs = row_start_ptr + col_offsets
+    mask = col_offsets < cols
+    x = tl.load(input_ptrs, mask=mask, other=float('-inf'))
+    x_max = tl.max(x, axis=0)
+    safe_x = x - x_max
+    numerator = tl.exp(safe_x)
+    denominator = tl.sum(numerator, axis=0)
+    softmax = numerator / denominator
+    tl.store(out_ptr + col_offsets + row_idx * stride_out, softmax, mask=mask)
+```
+
+what i learned:
+- triton kernels feel like a higher-level version of the cuda grid/block mental model: `program_id` replaces manual `blockIdx * blockDim + threadIdx` math.
+- masking is nice. no explicit `if (idx < n)` branches, just `mask` on loads/stores.
+- writing softmax in triton made the usual "subtract max for stability" pattern really clear.
+
+---
+
 ## nov 28 2025: add_broadcast
 
 broadcasting addition across tensors of different shapes. adds a 3d tensor (X,Y,Z) with a 2d tensor (X,Y) and a 1d tensor (X).
+
+this one was me coming back again to “shapes i actually see in pytorch”: 3d + 2d + 1d. i had to slow down, draw the shapes on paper, and write out the index formulas by hand before i trusted the kernel. it tied together the 3d indexing from earlier with the kind of broadcasting semantics i use all the time on the python side.
 
 code: [add_broadcast.cu](https://github.com/niyarrbarman/cuda/tree/main/src/add_broadcast/add_broadcast.cu)
 
@@ -256,4 +343,5 @@ what i learned:
 - 3d indexing: `x * (Y * Z) + y * Z + z` for the full tensor
 - `dim3` can handle all three dimensions for blocks and grids
 
+---
 
