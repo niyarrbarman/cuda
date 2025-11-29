@@ -15,7 +15,7 @@ $(TARGET): $(SRC)
 	@$(NVCC) $(NVCCFLAGS) -o $@ $< $(LDFLAGS)
 
 clean:
-	rm -f $(TARGET) *.o
+	@rm -f $(TARGET) *.o
 
 run: build
 	./$(TARGET)

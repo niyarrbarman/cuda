@@ -36,7 +36,7 @@ int main(){
     float *ha, *hb, *hc;    // initialize floats on host
     float *da, *db, *dc;    // initialize floats on device
 
-    size_t size = N * sizeof(float);    // 1M * 4
+    size_t size = N * sizeof(float);    // 10M * 4
 
     ha = (float*)malloc(size);
     hb = (float*)malloc(size);
@@ -54,7 +54,8 @@ int main(){
     cudaMemcpy(da, ha, size, cudaMemcpyHostToDevice);
     cudaMemcpy(db, hb, size, cudaMemcpyHostToDevice);
 
-    int num_blocks = (N + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    // int num_blocks = (N + BLOCK_SIZE - 1) / BLOCK_SIZE; 
+    int num_blocks = 4;
 
     printf("warm up run\n");
     for (int i=0; i<5; i++){
@@ -91,5 +92,14 @@ int main(){
     printf("host avg time = %fms\n", hostAvgTime * 1000);
     printf("device avg time = %fms\n", deviceAvgTime * 1000);
 
+    printf("speedup = %fx\n", hostAvgTime / deviceAvgTime);
+
+    free(ha);
+    free(hb);
+    free(hc);
+    cudaFree(da);
+    cudaFree(db);
+    cudaFree(dc);
+    
     return 0;
 }
