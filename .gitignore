@@ -8,6 +8,17 @@
 *.ptx
 *.fatbin
 
+# Nsight Systems profiling
+*.nsys-rep
+*.sqlite
+*.qdstrm
+*.log
+
+# Compiled CUDA binaries
+nvtx_matmul
+vec_add
+matmul
+
 # Jekyll
 _site/
 .sass-cache/

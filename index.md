@@ -38,6 +38,7 @@ learning cuda (and now triton) from scratch. tracking what works, what doesn't, 
         <li><a href="#nov-22-2025-matmul">matmul</a><span class="toc-note">naive matrix multiplication</span></li>
         <li><a href="#nov-22-2025-triton-add-and-softmax">triton</a><span class="toc-note">writing gpu kernels in python</span></li>
         <li><a href="#nov-28-2025-add-broadcast">add_broadcast</a><span class="toc-note">broadcasting across tensor ranks</span></li>
+        <li><a href="#nov-29-2025-nvtx-profiling">nvtx profiling</a><span class="toc-note">instrumenting cuda with nsight systems</span></li>
     </ul>
 </div>
 
@@ -342,6 +343,92 @@ what i learned:
 - how broadcasting works: expand smaller tensors to match larger ones
 - 3d indexing: `x * (Y * Z) + y * Z + z` for the full tensor
 - `dim3` can handle all three dimensions for blocks and grids
+
+---
+
+## nov 29 2025: nvtx profiling
+
+instrumenting cuda code with nvtx markers and profiling with nsight systems.
+
+wanted to actually see where time goes in my matmul code. not just "gpu is fast" but "how much is allocation vs copy vs compute". nvtx lets you wrap sections of code with named ranges, then nsys picks them up and shows you a breakdown.
+
+code: [nvtx_matmul.cu](https://github.com/niyarrbarman/cuda/tree/main/src/matmul/nvtx_matmul.cu)
+
+the idea is simple: push a named range before a section, pop it after. nested ranges work too.
+
+```cuda
+#include <nvtx3/nvToolsExt.h>
+
+void matrixMul(float* A, float* B, float* C, int N) {
+    nvtxRangePush("Matrix Multiplication");
+    
+    nvtxRangePush("Memory Allocation");
+    cudaMalloc(&d_A, size);
+    cudaMalloc(&d_B, size);
+    cudaMalloc(&d_C, size);
+    nvtxRangePop();
+
+    nvtxRangePush("Memory Copy H2D");
+    cudaMemcpy(d_A, A, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, B, size, cudaMemcpyHostToDevice);
+    nvtxRangePop();
+
+    nvtxRangePush("Kernel Execution");
+    matrixMulKernel<<<numBlocks, threadsPerBlock>>>(d_A, d_B, d_C, N);
+    cudaDeviceSynchronize();
+    nvtxRangePop();
+
+    nvtxRangePush("Memory Copy D2H");
+    cudaMemcpy(C, d_C, size, cudaMemcpyDeviceToHost);
+    nvtxRangePop();
+
+    nvtxRangePush("Memory Deallocation");
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
+    nvtxRangePop();
+
+    nvtxRangePop();  // end Matrix Multiplication
+}
+```
+
+compile with nvtx library linked:
+
+```bash
+nvcc -o nvtx_matmul nvtx_matmul.cu -lnvToolsExt -lineinfo
+```
+
+then profile with nsys:
+
+```bash
+nsys profile --trace=cuda,nvtx --stats=true ./nvtx_matmul
+```
+
+the output shows exactly where time goes:
+
+```
+ Time (%)  Total Time (ns)  Instances   Avg (ns)         Range         
+ --------  ---------------  ---------  -------------  ----------------------
+     50.0      125,366,415          1  125,366,415.0  Matrix Multiplication
+     50.0      125,357,659          1  125,357,659.0  Memory Allocation    
+      0.0            3,652          1        3,652.0  Kernel Execution     
+      0.0            3,330          1        3,330.0  Memory Copy H2D      
+      0.0              140          1          140.0  Memory Deallocation  
+      0.0              110          1          110.0  Memory Copy D2H      
+```
+
+almost all the time (~125ms) is in memory allocation. the first `cudaMalloc` triggers cuda context initialization — that's the cold start cost. actual kernel execution is just ~3.6µs.
+
+implemented:
+- nvtx range markers around each phase
+- nested ranges (outer "Matrix Multiplication" contains inner phases)
+- nsys profiling with `--trace=cuda,nvtx`
+
+what i learned:
+- `nvtxRangePush` / `nvtxRangePop` for instrumenting code sections
+- first cuda call pays context initialization cost
+- actual compute is often tiny compared to setup overhead
+- profiling reveals where optimization effort should go
 
 ---
 

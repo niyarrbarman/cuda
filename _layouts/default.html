@@ -105,6 +105,20 @@
             background-repeat: no-repeat;
             background-position: center;
         }
+        /* light mode icons */
+        .nav-icon.home-icon {
+            background-image: url('{{ site.baseurl }}/assets/home-icon.png');
+        }
+        .nav-icon.blog-icon {
+            background-image: url('{{ site.baseurl }}/assets/blog-icon.png');
+        }
+        /* dark mode icons */
+        [data-theme="dark"] .nav-icon.home-icon {
+            background-image: url('{{ site.baseurl }}/assets/home-inv.png');
+        }
+        [data-theme="dark"] .nav-icon.blog-icon {
+            background-image: url('{{ site.baseurl }}/assets/blog-inv.png');
+        }
         .nav-label {
             position: absolute;
             left: 50%;
@@ -345,12 +359,12 @@
         <p class="author">~ niyar r barman</p>
         <nav>
             <a href="https://niyarrbarman.github.io" aria-label="home">
-                <span class="nav-icon home-icon" style="background-image: url('{{ site.baseurl }}/assets/home-icon.png');"></span>
+                <span class="nav-icon home-icon"></span>
                 <span class="nav-label">home</span>
                 <span class="sr-only">home</span>
             </a>
             <a href="{{ site.baseurl }}/" aria-label="blog">
-                <span class="nav-icon blog-icon" style="background-image: url('{{ site.baseurl }}/assets/blog-icon.png');"></span>
+                <span class="nav-icon blog-icon"></span>
                 <span class="nav-label">blog</span>
                 <span class="sr-only">blog</span>
             </a>
