@@ -15,9 +15,9 @@
 *.log
 
 # Compiled CUDA binaries
-nvtx_matmul
-vec_add
-matmul
+# nvtx_matmul
+# vec_add
+# matmul
 
 # Jekyll
 _site/
