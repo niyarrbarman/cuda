@@ -35,10 +35,11 @@ learning cuda (and now triton) from scratch. tracking what works, what doesn't, 
     <ul class="toc-list">
         <li><a href="#nov-11-2025-vec-add">vec-add</a><span class="toc-note">basic gpu vector addition</span></li>
         <li><a href="#nov-15-2025-vec-add-3d">vec-add 3d</a><span class="toc-note">1d vs 3d kernel layouts</span></li>
-        <li><a href="#nov-22-2025-matmul">matmul</a><span class="toc-note">naive matrix multiplication</span></li>
+        <li><a href="#nov-16-2025-matmul">matmul</a><span class="toc-note">naive matrix multiplication</span></li>
         <li><a href="#nov-22-2025-triton-add-and-softmax">triton</a><span class="toc-note">writing gpu kernels in python</span></li>
         <li><a href="#nov-28-2025-add-broadcast">add_broadcast</a><span class="toc-note">broadcasting across tensor ranks</span></li>
         <li><a href="#nov-29-2025-nvtx-profiling">nvtx profiling</a><span class="toc-note">instrumenting cuda with nsight systems</span></li>
+        <li><a href="#nov-30-2025-cublas-matmul">cublas matmul</a><span class="toc-note">sgemm and hgemm with cublas</span></li>
     </ul>
 </div>
 
@@ -429,6 +430,76 @@ what i learned:
 - first cuda call pays context initialization cost
 - actual compute is often tiny compared to setup overhead
 - profiling reveals where optimization effort should go
+
+---
+
+## nov 30 2025: cublas matmul
+
+matrix multiplication using cublas instead of writing my own kernel. sgemm (float32) and hgemm (float16).
+
+after writing naive matmul by hand, i wanted to see what the "real" way looks like. cublas is nvidia's optimized blas library — it's what pytorch uses under the hood. the tricky part is cublas assumes column-major (fortran style), but i store matrices row-major (c style). there's a neat trick to avoid transposing.
+
+code: [matmul_cublas.cu](https://github.com/niyarrbarman/cuda/tree/main/src/cuBLAS/matmul_cublas.cu)
+
+gemm computes:
+
+<p class="math">C = αAB + βC</p>
+
+with α = 1, β = 0 it's just C = AB.
+
+the column-major workaround: instead of computing C = A × B directly, we compute C^T = B^T × A^T. since:
+
+<p class="math">(AB)ᵀ = BᵀAᵀ</p>
+
+and our row-major matrices look like their transposes to cublas, passing B first then A gives us the right answer in row-major C:
+
+```cuda
+float alpha = 1.0f, beta = 0.0f;
+cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N,
+            N, M, K,           // dimensions
+            &alpha,
+            d_B, N,            // B first (!)
+            d_A, K,            // then A
+            &beta,
+            d_C, N);           // output
+```
+
+the weird argument order (B before A) is the trick. leading dimensions (N, K, N) match the "inner" dimension of each matrix when viewed column-major.
+
+hgemm is the same but with half precision. uses tensor cores on newer gpus. need to convert float32 inputs to fp16 first:
+
+```cuda
+// convert to half precision
+half A_h[M * K], B_h[K * N];
+for (int i = 0; i < M * K; i++) {
+    A_h[i] = __float2half(A[i]);
+}
+
+// hgemm call — same pattern as sgemm
+__half alpha_h = __float2half(1.0f), beta_h = __float2half(0.0f);
+cublasHgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N,
+            N, M, K, &alpha_h,
+            d_B_h, N, d_A_h, K,
+            &beta_h, d_C_h, N);
+
+// convert result back
+for (int i = 0; i < M * N; i++) {
+    C_cublas_h[i] = __half2float(C_h[i]);
+}
+```
+
+implemented:
+- sgemm for float32 matmul
+- hgemm for float16 matmul (tensor core eligible)
+- column-major workaround by swapping A and B
+- fp16 conversion with `__float2half` / `__half2float`
+
+what i learned:
+- cublas is column-major (fortran), not row-major (c)
+- the transpose trick: pass B then A to get row-major output
+- hgemm uses half precision — can leverage tensor cores
+- `cuda_fp16.h` for half-precision intrinsics
+- always wrap cublas/cuda calls in error-checking macros
 
 ---
 
