@@ -14,3 +14,10 @@ kramdown:
 # Navigation
 header_pages:
   - README.md
+
+# Exclude from build
+exclude:
+  - src/py/.venv
+  - .venv
+  - node_modules
+  - vendor

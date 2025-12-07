@@ -11,7 +11,7 @@ learning cuda (and now triton) from scratch. tracking what works, what doesn't, 
 <ul class="resource-list">
     <li>
         <a href="https://www.youtube.com/watch?v=86FAWCzIe_4">
-            hpc computing with gpus — elliot arledge
+            hpc with gpus — elliot arledge
         </a>
     </li>
     <li>
@@ -40,6 +40,7 @@ learning cuda (and now triton) from scratch. tracking what works, what doesn't, 
         <li><a href="#nov-28-2025-add-broadcast">add_broadcast</a><span class="toc-note">broadcasting across tensor ranks</span></li>
         <li><a href="#nov-29-2025-nvtx-profiling">nvtx profiling</a><span class="toc-note">instrumenting cuda with nsight systems</span></li>
         <li><a href="#nov-30-2025-cublas-matmul">cublas matmul</a><span class="toc-note">sgemm and hgemm with cublas</span></li>
+        <li><a href="#dec-7-2025-cutile-vec-add">cuTile vec-add</a><span class="toc-note">tile-based kernels in python</span></li>
     </ul>
 </div>
 
@@ -66,7 +67,7 @@ __global__ void vector_add_gpu(float *a, float* b, float*c, int n){
 
 the global thread index formula:
 
-<p class="math">i = blockIdx.x × blockDim.x + threadIdx.x</p>
+$$i = \texttt{blockIdx.x} \times \texttt{blockDim.x} + \texttt{threadIdx.x}$$
 
 the `if` guard prevents out-of-bounds access when N isn't a perfect multiple of block size.
 
@@ -90,7 +91,7 @@ cudaDeviceSynchronize();
 
 the `<<<num_blocks, BLOCK_SIZE>>>` syntax is cuda's way of specifying grid and block dimensions. number of blocks needed:
 
-<p class="math">num_blocks = ⌈N / BLOCK_SIZE⌉</p>
+$$\texttt{num\_blocks} = \left\lceil \frac{N}{\texttt{BLOCK\_SIZE}} \right\rceil$$
 
 `cudaDeviceSynchronize()` waits for the kernel to finish before timing.
 
@@ -129,7 +130,7 @@ __global__ void vector_add_gpu_1d(float *a, float *b, float *c, int n) {
 
 3d kernel treats the flat array as a 3d volume. each thread gets (i, j, k) coordinates. the linearized index:
 
-<p class="math">idx = i + j·nₓ + k·nₓ·nᵧ</p>
+$$\texttt{idx} = i + j \cdot n_x + k \cdot n_x \cdot n_y$$
 
 ```cuda
 __global__ void vector_add_gpu_3d(float *a, float *b, float *c, int nx, int ny, int nz) {
@@ -201,7 +202,7 @@ __global__ void matmul(float* a, float* b, float* c, int n){
 
 matrix multiplication: C = A × B where each element:
 
-<p class="math">Cᵢⱼ = Σₖ Aᵢₖ · Bₖⱼ</p>
+$$C_{ij} = \sum_{k} A_{ik} \cdot B_{kj}$$
 
 complexity is O(n³) — each of n² threads does n multiply-adds. simple but not optimal — lots of global memory reads.
 
@@ -295,9 +296,11 @@ code: [add_broadcast.cu](https://github.com/niyarrbarman/cuda/tree/main/src/add_
 
 the trick is computing the right index for each tensor rank. for tensors with shapes (X, Y, Z), (X, Y), and (X):
 
-<p class="math">idx₃ = x·(Y·Z) + y·Z + z</p>
-<p class="math">idx₂ = x·Y + y</p>
-<p class="math">idx₁ = x</p>
+$$\texttt{idx}_3 = x \cdot (Y \cdot Z) + y \cdot Z + z$$
+
+$$\texttt{idx}_2 = x \cdot Y + y$$
+
+$$\texttt{idx}_1 = x$$
 
 ```cuda
 __global__ void add_broadcast(
@@ -418,7 +421,7 @@ the output shows exactly where time goes:
       0.0              110          1          110.0  Memory Copy D2H      
 ```
 
-almost all the time (~125ms) is in memory allocation. the first `cudaMalloc` triggers cuda context initialization — that's the cold start cost. actual kernel execution is just ~3.6µs.
+matrix multiplication is the outer nvtx range that wraps everything, so its time includes all nested ranges. the real story: memory allocation takes ~125ms because the first `cudaMalloc` triggers cuda context initialization. that's the cold start cost. actual kernel execution is just ~3.6µs.
 
 implemented:
 - nvtx range markers around each phase
@@ -443,13 +446,13 @@ code: [matmul_cublas.cu](https://github.com/niyarrbarman/cuda/tree/main/src/cuBL
 
 gemm computes:
 
-<p class="math">C = αAB + βC</p>
+$$C = \alpha AB + \beta C$$
 
 with α = 1, β = 0 it's just C = AB.
 
 the column-major workaround: instead of computing C = A × B directly, we compute C^T = B^T × A^T. since:
 
-<p class="math">(AB)ᵀ = BᵀAᵀ</p>
+$$(AB)^T = B^T A^T$$
 
 and our row-major matrices look like their transposes to cublas, passing B first then A gives us the right answer in row-major C:
 
@@ -503,3 +506,65 @@ what i learned:
 
 ---
 
+## dec 7 2025: cuTile vec-add
+
+vector addition using nvidia's cuTile library. tile-based gpu programming in pure python.
+
+triton showed me you can write gpu kernels without touching c++. cuTile is nvidia's answer to that. a python DSL that automatically leverages tensor cores and tensor memory accelerators while staying portable across gpu architectures. the key abstraction is tiles: immutable, fixed-size chunks of data that live in registers. arrays live in global memory, tiles don't. you load tiles from arrays, do math on tiles, store tiles back.
+
+code: [vec-add-cutile.py](https://github.com/niyarrbarman/cuda/tree/main/src/py/vec-add-cutile.py)
+
+the kernel uses the `@ct.kernel` decorator. each block (identified by `ct.bid(0)`) loads a tile from both input arrays, adds them, and stores the result:
+
+```python
+@ct.kernel
+def vector_add(a, b, c, tile_size: ct.Constant[int]):
+    pid = ct.bid(0)
+
+    a_tile = ct.load(a, index=(pid,), shape=(tile_size,))
+    b_tile = ct.load(b, index=(pid,), shape=(tile_size,))
+
+    result = a_tile + b_tile
+
+    ct.store(c, index=(pid,), tile=result)
+```
+
+`ct.bid(0)` is the block index, same as `blockIdx.x` in cuda. `ct.load` grabs a tile from global memory into registers. the `index` tells it which tile (block), `shape` tells it how big (must be power of two). tiles are immutable, so `a_tile + b_tile` creates a new tile `result`. then `ct.store` writes it back to global memory.
+
+launching is similar to triton. you specify the grid size and let the library handle the rest:
+
+```python
+vec_size = 2**12
+tile_size = 2**4
+
+a = cp.random.uniform(-1, 1, vec_size)
+b = cp.random.uniform(-1, 1, vec_size)
+c = cp.zeros_like(a)
+
+grid_size = (ceil(vec_size / tile_size), 1, 1)
+
+ct.launch(cp.cuda.get_current_stream(), grid_size, vector_add, (a, b, c, tile_size))
+```
+
+grid size is number of tiles needed:
+
+$$\texttt{grid\_size} = \left\lceil \frac{\texttt{vec\_size}}{\texttt{tile\_size}} \right\rceil$$
+
+cupy handles the device arrays. `cp.random.uniform` creates data directly on gpu, no explicit memcpy needed.
+
+implemented:
+- tile-based vector addition
+- explicit tile loads and stores
+- grid launch with cupy arrays
+- verification against numpy reference
+
+what i learned:
+- cuTile is nvidia's python dsl for gpu kernels
+- arrays = global memory (mutable), tiles = registers (immutable)
+- tile dimensions must be compile-time constants and powers of two
+- `ct.bid(0)` for block index, like `blockIdx.x`
+- `ct.load` and `ct.store` move data between arrays and tiles
+- `ct.Constant[int]` for compile-time constants
+- cuTile auto-leverages tensor cores and TMA when possible
+
+---

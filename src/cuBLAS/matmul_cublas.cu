@@ -1,3 +1,4 @@
+#include <cuda_device_runtime_api.h>
 #include <stdio.h>
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
@@ -75,7 +76,7 @@ int main(){
     // the actual gemm call
     // C = alpha * A * B + beta * C
     // alpha = 1.0, beta = 0.0 means just C = A * B
-    // 
+    //     //
     // the weird argument order (d_B first, then d_A) is because cublas is column-major.
     // we're effectively computing C^T = B^T * A^T which gives us C in row-major.
     // leading dimensions match the "inner" dimension of each matrix in column-major view.

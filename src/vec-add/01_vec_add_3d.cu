@@ -1,3 +1,4 @@
+#include <climits>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -142,7 +143,7 @@ int main(){
     }
     double gpu_3d_avg_time = gpu_3d_total_time / 20.0;
 
-    
+
     cudaMemcpy(h_c_gpu_3d, d_c_3d, size, cudaMemcpyDeviceToHost);
     bool correct_3d = true;
     for (int i = 0; i < N; i++) {
@@ -153,7 +154,7 @@ int main(){
         }
     }
     printf("3D Results are %s\n", correct_3d ? "correct" : "incorrect");
-    
+
     printf("CPU average time: %f milliseconds\n", cpu_avg_time * 1000);
     printf("GPU 1D average time: %f milliseconds\n", gpu_1d_avg_time * 1000);
     printf("GPU 3D average time: %f milliseconds\n", gpu_3d_avg_time * 1000);
