@@ -685,7 +685,7 @@ instead of one thread summing 8192 values sequentially, 256 threads each sum ~32
        [+]               [+]             <- 64 results (step 2)
          \              /
           ...continues...                <- 8 steps total
-              [sum]                       <- final answer
+              [sum]                      <- final answer
 ```
 
 sequential: O(n) steps. tree reduction: O(log n) steps with n/2 threads working in parallel.
