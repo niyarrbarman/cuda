@@ -269,10 +269,13 @@
                 background: var(--code-bg);
                 padding: 20px 24px;
                 border-radius: 4px;
-                overflow-x: auto;
+                overflow-x: visible;
                 margin: 1.8em 0;
                 border: 1px solid var(--border);
                 position: relative;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                word-break: break-word;
             }
             .copy-button {
                 position: absolute;
@@ -307,6 +310,9 @@
                 line-height: 1.6;
                 color: var(--code-text);
                 border-radius: 0;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                word-break: break-word;
             }
             .hljs {
                 background: transparent !important;
@@ -368,6 +374,10 @@
                 text-align: center;
                 font-size: 0.9em;
                 color: var(--muted);
+            }
+            footer p {
+                text-align: center;
+                margin: 0 auto;
             }
             footer::before {
                 content: "";
