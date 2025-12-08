@@ -572,18 +572,37 @@
             });
         </script>
 
-        <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+        <script
+            defer
+            src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+            crossorigin="anonymous"
+        ></script>
+        <script
+            defer
+            src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+            crossorigin="anonymous"
+        ></script>
         <script>
+            function renderKaTeX() {
+                if (typeof renderMathInElement !== "undefined") {
+                    renderMathInElement(document.body, {
+                        delimiters: [
+                            { left: "$$", right: "$$", display: true },
+                            { left: "$", right: "$", display: false },
+                            { left: "\\[", right: "\\]", display: true },
+                            { left: "\\(", right: "\\)", display: false },
+                        ],
+                        throwOnError: false,
+                    });
+                }
+            }
+            // Try multiple times to ensure KaTeX renders
             document.addEventListener("DOMContentLoaded", function () {
-                renderMathInElement(document.body, {
-                    delimiters: [
-                        { left: "$$", right: "$$", display: true },
-                        { left: "$", right: "$", display: false },
-                    ],
-                    throwOnError: false,
-                });
+                setTimeout(renderKaTeX, 0);
+                setTimeout(renderKaTeX, 100);
+                setTimeout(renderKaTeX, 500);
             });
+            window.addEventListener("load", renderKaTeX);
         </script>
         <script>
             // Add copy buttons to code blocks
