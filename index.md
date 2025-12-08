@@ -41,6 +41,7 @@ learning cuda (and now triton) from scratch. tracking what works, what doesn't, 
         <li><a href="#nov-29-2025-nvtx-profiling">nvtx profiling</a><span class="toc-note">instrumenting cuda with nsight systems</span></li>
         <li><a href="#nov-30-2025-cublas-matmul">cublas matmul</a><span class="toc-note">sgemm and hgemm with cublas</span></li>
         <li><a href="#dec-7-2025-cutile-vec-add">cuTile vec-add</a><span class="toc-note">tile-based kernels in python</span></li>
+        <li><a href="#dec-8-2025-softmax-naive-vs-optimized">softmax</a><span class="toc-note">shared memory + tree reduction</span></li>
     </ul>
 </div>
 
@@ -568,3 +569,153 @@ what i learned:
 - cuTile auto-leverages tensor cores and TMA when possible
 
 ---
+
+## dec 8 2025: softmax (naive vs optimized)
+
+back to cuda c++. implemented softmax three ways: cpu, naive gpu, and optimized gpu with shared memory + parallel reduction.
+
+code: [softmax.cu](https://github.com/niyarrbarman/cuda/tree/main/src/softmax/softmax.cu)
+
+softmax for a row is: subtract max (numerical stability), exponentiate, divide by sum. simple enough, but the gpu implementation matters a lot.
+
+### cpu baseline
+
+straightforward triple loop. for each row: find max, compute exp and sum, normalize.
+
+```cpp
+void cpu_softmax(float* input, float* output, int rows, int cols) {
+    for (int i = 0; i < rows; i++) {
+        float max_val = input[i * cols];
+        for (int j = 1; j < cols; j++) {
+            if (input[i * cols + j] > max_val) max_val = input[i * cols + j];
+        }
+        float sum = 0.0f;
+        for (int j = 0; j < cols; j++) {
+            output[i * cols + j] = expf(input[i * cols + j] - max_val);
+            sum += output[i * cols + j];
+        }
+        for (int j = 0; j < cols; j++) {
+            output[i * cols + j] /= sum;
+        }
+    }
+}
+```
+
+### naive gpu
+
+one thread per row. each thread loops through all columns sequentially. basically the cpu code but parallelized across rows:
+
+```cpp
+__global__ void gpu_softmax_naive(float* input, float* output, int rows, int cols) {
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    if (row < rows) {
+        // same triple loop as cpu, but for one row
+        float max_val = input[row * cols];
+        for (int j = 1; j < cols; j++) { /* find max */ }
+        for (int j = 0; j < cols; j++) { /* exp and sum */ }
+        for (int j = 0; j < cols; j++) { /* normalize */ }
+    }
+}
+```
+
+launch config: `<<<(rows + 255) / 256, 256>>>`. gets ~25x speedup over cpu. not bad, but each thread does O(cols) work alone. we can do better.
+
+### optimized gpu: shared memory + tree reduction
+
+the key insight: instead of one thread per row, use one *block* per row. 256 threads collaborate on a single row using shared memory.
+
+```cpp
+__global__ void gpu_softmax_optimized(float* input, float* output, int rows, int cols) {
+    extern __shared__ float sdata[];
+    int row = blockIdx.x;
+    int tid = threadIdx.x;
+    int blockSize = blockDim.x;
+
+    // step 1: parallel max reduction
+    float max_val = -INFINITY;
+    for (int j = tid; j < cols; j += blockSize) {
+        max_val = fmaxf(max_val, input[row * cols + j]);
+    }
+    sdata[tid] = max_val;
+    __syncthreads();
+
+    // tree reduction for max
+    for (int stride = blockSize/2; stride > 0; stride >>= 1) {
+        if (tid < stride) sdata[tid] = fmaxf(sdata[tid], sdata[tid + stride]);
+        __syncthreads();
+    }
+    max_val = sdata[0];
+    __syncthreads();
+
+    // step 2: parallel exp + sum reduction
+    float thrd_sum = 0.0f;
+    for (int j = tid; j < cols; j += blockSize) {
+        output[row * cols + j] = expf(input[row * cols + j] - max_val);
+        thrd_sum += output[row * cols + j];
+    }
+    sdata[tid] = thrd_sum;
+    __syncthreads();
+
+    // tree reduction for sum
+    for (int stride = blockSize/2; stride > 0; stride >>= 1) {
+        if (tid < stride) sdata[tid] += sdata[tid + stride];
+        __syncthreads();
+    }
+    float sum = sdata[0];
+    __syncthreads();
+
+    // step 3: parallel normalize
+    for (int j = tid; j < cols; j += blockSize) {
+        output[row * cols + j] /= sum;
+    }
+}
+```
+
+launch config: `<<<rows, 256, 256 * sizeof(float)>>>`. one block per row, shared memory for reduction.
+
+### why tree reduction works
+
+instead of one thread summing 8192 values sequentially, 256 threads each sum ~32 values, then combine results in log₂(256) = 8 steps:
+
+```
+[t0] [t1] [t2] [t3] [t4] [t5] [t6] [t7]  <- 256 partial results
+   \  /     \  /     \  /     \  /
+   [+]      [+]      [+]      [+]        <- 128 results (step 1)
+      \    /            \    /
+       [+]               [+]             <- 64 results (step 2)
+         \              /
+          ...continues...                <- 8 steps total
+              [sum]                       <- final answer
+```
+
+sequential: O(n) steps. tree reduction: O(log n) steps with n/2 threads working in parallel.
+
+### shared memory
+
+shared memory is ~80x faster than global memory. all threads in a block can read/write to it. perfect for reductions where threads need to share intermediate results. declared with `extern __shared__` and allocated at launch time (third kernel parameter).
+
+### results (8192 x 8192 matrix)
+
+```
+CPU time:                484.017 ms
+GPU Naive time:          16.456 ms (Speedup: 29.41x)
+GPU Optimized time:      1.812 ms (Speedup: 267.17x)
+
+Optimized vs Naive:      9.08x faster
+```
+
+implemented:
+- cpu softmax baseline
+- naive gpu softmax (one thread per row)
+- optimized gpu softmax (one block per row, shared memory, tree reduction)
+- parallel max reduction
+- parallel sum reduction
+- correctness verification against cpu reference
+
+what i learned:
+- naive gpu parallelizes across rows, but each thread still does sequential work within a row
+- optimized version parallelizes *within* each row using block-level cooperation
+- tree reduction turns O(n) into O(log n) for aggregations (max, sum)
+- shared memory is the key to inter-thread communication within a block
+- `__syncthreads()` is necessary after shared memory writes before reads
+- launch config matters: naive uses `<<<numBlocks, blockSize>>>`, optimized uses `<<<rows, blockSize, sharedMem>>>`
