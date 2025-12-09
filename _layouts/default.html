@@ -45,12 +45,9 @@
         <link
             rel="stylesheet"
             id="hljs-dark"
-            href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
+            href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css"
             media="print"
-            onload="
-                this.media = 'all';
-                this.disabled = true;
-            "
+            onload="this.media = 'all'"
         />
         <style>
             :root {
@@ -68,6 +65,7 @@
                 --hr: #d4cdc0;
                 --toc-bg: #f8f5ef;
                 --accent: #c4a35a;
+                --bg-rgba: rgba(253, 251, 247, 0.1);
             }
             [data-theme="dark"] {
                 --bg: #1a1814;
@@ -84,6 +82,7 @@
                 --hr: #3d362c;
                 --toc-bg: #221e18;
                 --accent: #c4a35a;
+                --bg-rgba: rgba(26, 24, 20, 0.1);
             }
             * {
                 box-sizing: border-box;
@@ -128,6 +127,33 @@
                 color: var(--muted);
             }
             .theme-toggle:hover {
+                opacity: 1;
+            }
+            .scroll-to-top {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: var(--bg-rgba);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                border: none;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                font-size: 1.2em;
+                font-weight: bold;
+                opacity: 0;
+                transition: opacity 0.2s;
+                color: var(--muted);
+            }
+            .scroll-to-top.visible {
+                opacity: 0.8;
+            }
+            .scroll-to-top:hover {
                 opacity: 1;
             }
             h1.site-title {
@@ -538,6 +564,13 @@
                     top: -5px;
                     right: -5px;
                 }
+                .scroll-to-top {
+                    bottom: 10px;
+                    right: 10px;
+                    width: 35px;
+                    height: 35px;
+                    font-size: 1em;
+                }
                 .toc {
                     padding: 14px 18px;
                 }
@@ -586,6 +619,14 @@
         </header>
 
         <div class="content">{{ content }}</div>
+
+        <button
+            class="scroll-to-top"
+            onclick="scrollToTop()"
+            aria-label="Scroll to top"
+        >
+            ^
+        </button>
 
         <footer>
             <p><em>work in progress. adding more as i learn.</em></p>
@@ -712,6 +753,21 @@
                     setHighlightTheme(true);
                 }
             })();
+        </script>
+        <script>
+            function scrollToTop() {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+            document.addEventListener("DOMContentLoaded", function () {
+                const scrollButton = document.querySelector(".scroll-to-top");
+                window.addEventListener("scroll", function () {
+                    if (window.scrollY > 200) {
+                        scrollButton.classList.add("visible");
+                    } else {
+                        scrollButton.classList.remove("visible");
+                    }
+                });
+            });
         </script>
     </body>
 </html>

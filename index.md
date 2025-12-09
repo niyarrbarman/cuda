@@ -289,7 +289,7 @@ what i learned:
 
 ---
 
-## nov 28 2025: add_broadcast
+## nov 28 2025: add broadcast
 
 broadcasting addition across tensors of different shapes. adds a 3d tensor (X,Y,Z) with a 2d tensor (X,Y) and a 1d tensor (X).
 
