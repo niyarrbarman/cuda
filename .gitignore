@@ -51,3 +51,6 @@ src/triton/*.log
 *.swo
 *~
 .vscode/
+
+# Style configuration (personal reference)
+style.json

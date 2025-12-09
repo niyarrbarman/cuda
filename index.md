@@ -4,6 +4,8 @@ title: cuda
 date: 2025-11-12
 ---
 
+> *this page lives outside my main blog because it is iterative and messy, there are lots of small experiments, benchmarks, and incremental progress that doesn't fit the "finished post" format. think of it as a lab notebook.*
+
 learning cuda (and now triton) from scratch. tracking what works, what doesn't, and how fast things go.
 
 ### resources:
