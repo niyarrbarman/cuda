@@ -44,6 +44,7 @@ learning cuda (and now triton) from scratch. tracking what works, what doesn't, 
         <li><a href="#nov-30-2025-cublas-matmul">cublas matmul</a><span class="toc-note">sgemm and hgemm with cublas</span></li>
         <li><a href="#dec-7-2025-cutile-vec-add">cuTile vec-add</a><span class="toc-note">tile-based kernels in python</span></li>
         <li><a href="#dec-8-2025-softmax-naive-vs-optimized">softmax</a><span class="toc-note">shared memory + tree reduction</span></li>
+        <li><a href="#dec-9-2025-softmax-with-cublas">softmax (cuBLAS)</a><span class="toc-note">per-row softmax using cublas reductions</span></li>
     </ul>
 </div>
 
@@ -721,3 +722,106 @@ what i learned:
 - shared memory is the key to inter-thread communication within a block
 - `__syncthreads()` is necessary after shared memory writes before reads
 - launch config matters: naive uses `<<<numBlocks, blockSize>>>`, optimized uses `<<<rows, blockSize, sharedMem>>>`
+
+---
+
+## dec 9 2025: softmax with cuBLAS
+
+tried a different angle on softmax: lean on cuBLAS for the reduction bits (argmax, sum of exps) and use tiny cuda kernels just for the non-linear parts (exp + normalize).
+
+code: [softmax_cuBLAS.cu](https://github.com/niyarrbarman/cuda/tree/main/src/cuBLAS/softmax_cublas.cu)
+
+idea: per-row softmax with numerical stability:
+- use cuBLAS `cublasIsamax` to find the index of the maximum element in a row
+- read that `max_val` back to host (simple, if a bit chatty)
+- launch a kernel to subtract `max_val` and exponentiate
+- use cuBLAS `cublasSasum` to sum the exponentials
+- launch another kernel to normalize by the sum
+
+### kernels: subtract max + exp, then normalize
+
+two simple kernels, each 1d over the row:
+
+```cuda
+__global__ void sub_max_exp(const float* input, float* output, float max_val, int length){
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < length){
+        float val = input[idx] - max_val;
+        output[idx] = expf(val);
+    }
+}
+
+__global__ void normalize(float* data, float sum, int length){
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < length){
+        data[idx] = data[idx] / sum;
+    }
+}
+```
+
+launch config is standard 1d:
+
+```cuda
+const int THREADS = 256;
+const int BLOCKS = (cols + THREADS - 1) / THREADS;
+```
+
+each row is processed independently, so for every row:
+- find max index with cuBLAS
+- copy that `max_val` to host
+- run `sub_max_exp<<<BLOCKS, THREADS>>>`
+- get sum of exps with `cublasSasum`
+- run `normalize<<<BLOCKS, THREADS>>>`
+
+### using cuBLAS for reductions
+
+cuBLAS shines at reductions and vector ops, so instead of writing my own kernel for argmax/sum i just used:
+
+```cuda
+int max_idx = 0;
+CHECK_CUBLAS(cublasIsamax(handle, cols, row_in, 1, &max_idx));
+max_idx -= 1; // cuBLAS is 1-based
+
+float max_val;
+CHECK_CUDA(cudaMemcpy(&max_val, row_in + max_idx, sizeof(float),
+                      cudaMemcpyDeviceToHost));
+
+float sum_exp = 0.0f;
+CHECK_CUBLAS(cublasSasum(handle, cols, row_out, 1, &sum_exp));
+```
+
+this keeps the math in highly-optimized library code and lets my custom kernels stay tiny and easy to reason about.
+
+### verification + numerics
+
+used the same cpu softmax as a reference and compared every element:
+
+- generate a `128 x 128` matrix of random values in `[-10, 10]`
+- run `softmax_cuBlas` on gpu
+- run `cpu_softmax` on cpu
+- compute absolute difference per element, assert `diff < 1e-5`
+
+also manually checked that the first row sums to ~1.0 on the gpu result (good sanity check for softmax).
+
+### results (128 x 128 matrix)
+
+```
+Initializing 128 x 128 matrix with random values...
+Verifying results...
+Results match! Softmax implementation is correct.
+Sum of first row softmax (GPU): 1.000000
+```
+
+implemented:
+- cuBLAS-backed softmax (`cublasIsamax` + `cublasSasum`)
+- per-row gpu processing loop over device pointers
+- simple exp + normalize kernels
+- correctness check vs cpu implementation
+- basic numerical stability via max-subtraction
+
+what i learned:
+- cuBLAS makes reductions (argmax, asum) trivial to plug in
+- mixing cuBLAS with tiny custom kernels is a nice pattern: library for linear stuff, kernels for non-linear parts
+- still need to watch out for host-device transfers (`cudaMemcpy` of `max_val`) if scaling up
+- per-row loop in host code is simple but might become a bottleneck for huge batch sizes
+- the usual softmax stability trick (subtract max before exp) is just as important here

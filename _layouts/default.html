@@ -720,6 +720,7 @@
             function setHighlightTheme(isDark) {
                 const lightTheme = document.getElementById("hljs-light");
                 const darkTheme = document.getElementById("hljs-dark");
+                if (!lightTheme || !darkTheme) return;
                 if (isDark) {
                     lightTheme.disabled = true;
                     darkTheme.disabled = false;
@@ -743,15 +744,25 @@
                     setHighlightTheme(true);
                 }
             }
-            // Load saved theme
+            // Load saved theme (or system preference) and ensure
+            // highlight.js theme matches on first paint.
             (function () {
                 const saved = localStorage.getItem("theme");
                 const btn = document.querySelector(".theme-toggle");
-                if (saved === "dark") {
+                const prefersDark =
+                    window.matchMedia &&
+                    window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+                const isDark = saved === "dark" || (!saved && prefersDark);
+
+                if (isDark) {
                     document.body.setAttribute("data-theme", "dark");
                     if (btn) btn.textContent = "☀";
-                    setHighlightTheme(true);
+                } else if (btn) {
+                    btn.textContent = "☾";
                 }
+
+                setHighlightTheme(isDark);
             })();
         </script>
         <script>
